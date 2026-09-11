@@ -31,7 +31,7 @@ Outline); callers can register additional adapters.
 | Type | Role |
 |---|---|
 | `IRenderPostProcess` / `RenderPostProcessService` | Orchestrator. `Request<TRequest>(TRequest request, int priority = 0) → IRenderPostProcessTicket`. Ticks adapters via `PFound.LoopScheduler` BeforeRender. Throws if no adapter is registered for `TRequest`. |
-| `IRenderPostProcessTicket` / `RenderPostProcessTicket` | Owner-managed handle; dispose to drop the request from the stack. |
+| `IRenderPostProcessTicket` | Owner-managed handle returned by `Request<TRequest>`; dispose to drop the request from the stack. The implementation (`RenderPostProcessTicket`) is `internal` — consumers only ever see the interface. |
 | `RenderPostProcessRegistration` (static) | `Register(DependencyContainer registry, RenderPostProcessOptions options = null, params IRenderPostProcessAdapter[] extraAdapters) → IRenderPostProcess`. Wires the built-in Blur + Outline adapters + any extras and registers the service instance. |
 | `RenderPostProcessOptions` | Per-adapter blend policies (`BlurPolicy`, `OutlinePolicy`), `MaxConcurrentRequestsPerEffect` (default 256), `WarnOnMissingVolumeComponent`. `Default`. |
 | `PostProcessBlendPolicy` (enum) | `HighestPriorityWins`, `WeightedSum`, `LatestWins`. |

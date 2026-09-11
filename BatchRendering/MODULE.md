@@ -2,7 +2,7 @@
 
 GPU-instanced batch rendering with Burst-compiled frustum + distance culling. Three backends (`Classic` / `Indirect` / `Procedural`) cover the spectrum from 100-instance gameplay batches to 500k-instance GPU-authored fields.
 
-> **Status:** v0.11.0 — shipped. See `specs/023-batch-rendering/` for the spec / plan / tasks / contracts. Release notes in `Render/CHANGELOG.md`.
+> **Status:** v0.11.0 — shipped. This sub-module keeps no changelog of its own.
 
 ---
 
@@ -103,7 +103,8 @@ Per the framework-wide golden rule, `BatchRenderingService.RegisterBatch(...) �
 
 ## Quick Start
 
-See `specs/023-batch-rendering/quickstart.md` for the canonical six-example walkthrough (classic, indirect, procedural, distance-cull foliage, Transform[] bridge, RenderGraph integration) and an EditMode test snippet.
+The backend, culling and RenderGraph sections above cover each path in turn; the EditMode and PlayMode
+suites under `BatchRendering/Tests/` are the executable reference for all of them.
 
 Bare-minimum classic batch:
 
@@ -142,5 +143,5 @@ transforms.Dispose();
 - `PFound.Render.Core` (sibling — `RenderFeatureBase`, `RenderPassBase`).
 - `PFound.LoopScheduler` (BeforeRender tick).
 - `Unity.RenderPipelines.Universal.Runtime` + `Unity.RenderPipelines.Core.Runtime` (URP feature).
-- `Unity.Burst`, `Unity.Collections`, `Unity.Mathematics`, `Unity.Jobs` (cull jobs + native containers).
+- `Unity.Burst`, `Unity.Collections`, `Unity.Mathematics` (cull jobs + native containers). The job interfaces and `JobHandle` come from `UnityEngine.CoreModule`, which every assembly already gets, so no separate jobs package reference is needed.
 - **Intentionally no** `PFound.DependencyContainer` dependency (consumer-side wiring per spec FR-002 / FR-004).

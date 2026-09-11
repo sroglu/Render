@@ -2,7 +2,7 @@
 
 Render-to-texture stacked-camera contexts for offscreen content — hero portraits, dialog backdrops, minimap panels, world-space mirrors. Pipeline-agnostic across three rendering backends (uGUI `RawImage`, UI Toolkit `VisualElement`, world-space `MeshRenderer`).
 
-> **Status:** v1.0 (Phase 10). See `Render/CHANGELOG.md` for release notes.
+> **Status:** v1.0 (Phase 10). See `RenderContext/CHANGELOG.md` for release notes.
 
 ---
 
@@ -29,7 +29,7 @@ Render-to-texture stacked-camera contexts for offscreen content — hero portrai
 | `IRenderContextService` | Entry point: `Acquire(descriptor, anchor) → IRenderContextHandle`, `Dispose()`. |
 | `RenderContextService` | Concrete implementation. Construct directly or register via `RenderContextRegistration.Register(container)`. |
 | `RenderContextRegistration` | Convenience bootstrap — `Register(container)` constructs service + registers on container + points `RenderContextResolver` at it. |
-| `RenderContextResolver` | Static facade — `Use(provider/instance/container/func)`, `Clear()`, `IsConfigured`. Host configures once at boot; wrapper resolves through this. |
+| `RenderContextResolver` | Static facade — `Use(provider/instance/container/func)`, `Clear()`, `IsConfigured`. Host configures once at boot; the sink wrapper resolves through the matching `internal Resolve()`. |
 | `IRenderContextServiceProvider` | Strategy interface for service resolution. Built-ins: `SingletonRenderContextServiceProvider`, `ContainerRenderContextServiceProvider`, `DelegateRenderContextServiceProvider`. |
 | `IRenderContextHandle` | Per-acquisition handle: `Texture`, `Camera`, `ContentRoot`, `IsAlive`, `Refresh()`, `IDisposable`. |
 | `IRenderContextAnchor` | Target abstraction: `Target`, `PreferredWidth/Height`, `TargetAlive`, `CreateSink()`. |
@@ -171,21 +171,25 @@ RenderContext/
 │   ├── Scene/          # RenderContextSceneFactory (BuildHierarchy + ResetCamera + DestroyChildren)
 │   ├── Watcher/        # AnchorResizeWatcher (LoopScheduler BeforeRender tick)
 │   └── Wrapper/        # RenderContextSinkBehaviour (opt-in MonoBehaviour)
+├── Editor/             # PFound.Render.RenderContext.Editor
+│   ├── Editor/
+│   │   └── RenderContextSinkBehaviourEditor.cs
+│   └── PFound.Render.RenderContext.Editor.asmdef
+├── Tests/
+│   ├── EditMode/       # PFound.Render.RenderContext.Tests
+│   └── PlayMode/       # PFound.Render.RenderContext.Tests.PlayMode
+├── CHANGELOG.md
+├── MODULE.md
 └── PFound.Render.RenderContext.asmdef
-
-RenderContext.Editor/    # Sibling editor folder (Render submodule convention)
-├── Editor/
-│   └── RenderContextSinkBehaviourEditor.cs
-└── PFound.Render.RenderContext.Editor.asmdef
 ```
 
-> **Layout note:** Spec (`plan.md`) initially showed Editor as a subfolder under RenderContext/. The Render submodule convention (Core, ColorGrading, Particles.Image, …) is a **sibling** `<Module>.Editor/` folder with the asmdef at its root. This module follows the sibling convention.
+> **Layout note:** the Editor companion lives in an `Editor/` subfolder of this sub-module, with its asmdef at the root of that subfolder — the same shape `Core` and `UIShapes` use.
 
 ---
 
 ## Tests
 
-EditMode (in shared `PFound.Render.Tests` asmdef):
+EditMode — assembly `PFound.Render.RenderContext.Tests` (`RenderContext/Tests/EditMode/`):
 
 - `RenderContextDescriptorTests` — value-struct validation rules.
 - `RenderContextPoolKeyTests` — 6-field equality, hash stability, per-lease-field exclusion.
@@ -200,12 +204,16 @@ EditMode (in shared `PFound.Render.Tests` asmdef):
 - `RenderContextZeroAllocSteadyStateTests` — SC-002 zero-alloc check (Recorder-based, soft-threshold).
 - `RenderContextDiagnosticsTests` — one-shot warning semantics (MSAA>2, CullingMask=~0, per-service-instance).
 
-PlayMode (in same asmdef):
+PlayMode — assembly `PFound.Render.RenderContext.Tests.PlayMode` (`RenderContext/Tests/PlayMode/`):
 
 - `RenderContextUGUISmokeTests` — US1 RT pixel-content assertion.
 - `RenderContextUIToolkitSmokeTests` — US2 RT pixel-content assertion via runtime UIDocument.
 - `RenderContextWorldSpaceSmokeTests` — US3 material-clone + pixel-content + sharedMaterial restoration.
 - `RenderContextWrapperParityTests` — `RenderContextSinkBehaviour` end-to-end through OnEnable/OnDisable.
+- `RenderContextBackendOrthogonalityTests` — SC-003 cross-backend parity: the same descriptor + content rendered through all three backends, then the three RTs pairwise pixel-compared.
+
+Both assemblies use the namespace `PFound.Render.Tests`. `ZeroAllocAssertions` and
+`Helpers/TestRenderContextAnchor` are shared fixtures, not suites.
 
 ---
 

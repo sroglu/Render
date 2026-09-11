@@ -35,7 +35,8 @@ GameSpecific runtime assets (the sub-modules ship none — see the GameSpecific 
 
 ## Assemblies
 
-Each sub-module is its own assembly (all `autoReferenced: true`); take only what you need:
+Ten sub-modules, 13 non-test assemblies (10 runtime + 3 Editor companions), all
+`autoReferenced: true`; take only what you need:
 
 | Assembly | Kind | Location |
 |---|---|---|
@@ -68,7 +69,7 @@ Render; no scripting-define gates are used.
 |---|---|---|
 | `PFound.Render.Core` | none | URP Universal.Runtime, URP Core.Runtime, Collections, Burst, Mathematics (`allowUnsafeCode`) |
 | `PFound.Render.Core.Editor` | `PFound.Render.Core`, `PFound.Utilities.EditorHelpers` | URP Universal.Runtime, URP Universal.Editor (Editor-only) |
-| `PFound.Render.BatchRendering` | `PFound.Render.Core`, `PFound.LoopScheduler` | URP Universal.Runtime, URP Core.Runtime, Burst, Collections, Mathematics, Jobs |
+| `PFound.Render.BatchRendering` | `PFound.Render.Core`, `PFound.LoopScheduler` | URP Universal.Runtime, URP Core.Runtime, Burst, Collections, Mathematics |
 | `PFound.Render.RenderContext` | `PFound.Render.Core`, `PFound.DependencyContainer`, `PFound.LoopScheduler` | URP Universal.Runtime, URP Core.Runtime |
 | `PFound.Render.RenderContext.Editor` | `PFound.Render.RenderContext` | — (Editor-only) |
 | `PFound.Render.Utilities` | none | Mathematics only |
@@ -122,12 +123,15 @@ struct + `CullingPolicy` / `BackendKind`; instance sources `NativeArrayInstanceS
 **RenderContext** — `RenderContextSinkBehaviour` (MonoBehaviour; `Texture`, `Camera`, `ContentRoot`,
 `IsAlive`); `IRenderContextService` / `RenderContextService`
 (`Acquire(RenderContextDescriptor, IRenderContextAnchor) → IRenderContextHandle`);
-`RenderContextResolver` (static — `Use(...)` / `Resolve()` / `Clear()` / `IsConfigured`);
+`RenderContextResolver` (static — `Use(...)` / `Clear()` / `IsConfigured`; the matching `Resolve()`
+is `internal`, called by the sink component, not by consumers);
 `RenderContextRegistration.Register(container)` bootstrap helper; the three anchor/sink pairs.
 
-**Utilities** — all pure static / disposable: `TextureFactory`, `TextureResizer`
-(+ `TextureResizeHandle`), `TextureResizer` GPU resize, `RenderingTools`, `RenderDebugTools`
-(strip-gated), `AutoSizedRenderTexture` (`IDisposable`).
+**Utilities** — all pure static / disposable, and independent of Core: `TextureFactory` (solid /
+gradient / tint generation + readable copies), `TextureResizer` (+ the `TextureResizeHandle` it
+returns), `RenderingTools` (material blend-mode, tint, camera scissor, shared-material assignment),
+`RenderDebugTools` (strip-gated world-space debug draw), `AutoSizedRenderTexture` (`IDisposable`
+render target that tracks a requested size).
 
 ---
 
@@ -208,14 +212,15 @@ result).
 
 ## asmdef dependency model
 
-The four assemblies are intentionally decoupled so a consumer takes only what it needs:
+The assemblies are intentionally decoupled so a consumer takes only what it needs. The four
+foundation sub-modules set the pattern the rest follow:
 
 - **Core is independent** — it references only Unity URP + Collections/Burst/Mathematics packages; no
   other PFound module. Everything else in Render that touches URP builds on top of it.
 - **Utilities is independent of Core** — it references only `Unity.Mathematics`, no URP, no Core. A
   project can take `PFound.Render.Utilities` alone. This independence is a hard contract.
 - **BatchRendering depends on Core** (`RenderFeatureBase` / `RenderPassBase`) **and**
-  `PFound.LoopScheduler` (before-render tick), plus the Burst/Collections/Jobs/Mathematics cull stack.
+  `PFound.LoopScheduler` (before-render tick), plus the Burst/Collections/Mathematics cull stack.
   It deliberately has **no** `PFound.DependencyContainer` dependency — container registration is
   consumer-side wiring, outside this module's surface.
 - **RenderContext depends on Core** (RT lifecycle delegates to `RenderTexturePool` — composition, not
@@ -224,8 +229,9 @@ The four assemblies are intentionally decoupled so a consumer takes only what it
   The service works standalone via `RenderContextResolver.Use(new RenderContextService())` — the
   container is one of four resolution strategies, never required.
 
-Editor companions (`Core.Editor`, `RenderContext.Editor`) are Editor-only (`includePlatforms:
-["Editor"]`) and reference their runtime peer.
+Editor companions (`Core.Editor`, `RenderContext.Editor`, `UIShapes.Editor`) are Editor-only
+(`includePlatforms: ["Editor"]`) and reference their runtime peer. Each lives in an `Editor/`
+subfolder of its sub-module, with its asmdef at the root of that subfolder.
 
 ---
 
@@ -253,7 +259,7 @@ Render/
 │   ├── Shaders/              #   shared HLSL includes: Common.hlsl, Math.hlsl, Sampling.hlsl
 │   ├── Editor/               # PFound.Render.Core.Editor — GameSpecific registration seam (stub)
 │   ├── Tests/                #   EditMode/ + PlayMode/
-│   └── MODULE.md, CHANGELOG.md
+│   └── MODULE.md
 ├── BatchRendering/           # PFound.Render.BatchRendering — Burst-culled GPU instancing service
 │   ├── Runtime/              #   Service/, RenderGraph/, culling jobs, instance sources
 │   ├── Tests/                #   EditMode/ + PlayMode/
@@ -286,7 +292,8 @@ Render/
 │   ├── Runtime/              #   ShaderWarmupController, WarmupSession/Batch, RenderShaderWarmupRegistration
 │   └── MODULE.md
 ├── UIShapes/                 # PFound.Render.UIShapes — SDF UI shape shader + tooling
-│   ├── Runtime/              #   UIShapeSizeSync, material-property/keyword helpers, Shaders/ (UIShape.shader + SDF/Noise/Effects HLSL), UIShape.mat
+│   ├── Runtime/              #   UIShapeSizeSync, ShapeType, material-property/keyword/effect helpers,
+│   │                         #   UIShapeSDF/Noise/Effects.hlsl, UIShape.mat, Shaders/ (UIShape.shader)
 │   ├── Editor/               # PFound.Render.UIShapes.Editor — inspector + bake window/service/validator
 │   └── MODULE.md
 ├── Shaders/                  # shared authored shaders (SoftToony URP shader set)
@@ -317,8 +324,8 @@ Per-sub-module gaps are detailed in each sub-module's `MODULE.md`. Subsystem-wid
   resize handles are all disposed by their owner. None subscribe to `SceneManager` unload events; a
   forgotten `Dispose` leaks until domain reload (Core's pool + the batch service emit leak/degrade
   warnings as a debugging aid, not an auto-fix).
-- **`TextureResizer` blit-path allocation is unavoidable** — only the pass-through path is asserted
-  zero-allocation; the downscale path must allocate one `Texture2D` for the readback.
+- **`TextureResizer` blit-path allocation is unavoidable** — only the pass-through path is
+  allocation-free; the downscale path must allocate one `Texture2D` for the readback.
 - **BatchRendering occlusion culling is a stub** (flag + one-shot warning) and indirect is
   single-chunk-per-batch in the current phase.
 - **No GameSpecific runtime assets ship** — the registration seam is reserved but empty.

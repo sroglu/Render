@@ -2,7 +2,7 @@
 
 Foundation primitives for every later Render phase: a base-class pair for URP 17 RenderGraph features/passes, a keyed transient `RenderTexture` pool with zero-allocation leak detection, a priority-ordered per-frame global shader parameter publisher, and the shared HLSL include library that all Phase 2+ shaders depend on.
 
-> **Status:** v0.1.0 — shipped 2026-05-15. See `Render/CHANGELOG.md` (entry `[0.1.0]`).
+> **Status:** v0.1.0 — shipped 2026-05-15. This sub-module keeps no changelog of its own.
 
 ---
 
@@ -19,8 +19,8 @@ Foundation primitives for every later Render phase: a base-class pair for URP 17
 - Persistent (session-lifetime) render targets — the pool is purely transient; long-lived RTs are client-managed via the raw `RenderTexture` API (Phase 1 spec clarification 2).
 - Compute / unsafe `ScriptableRenderPass` variants — `RenderPassBase<TPassData>` covers raster passes only. Compute base lands in a later phase when needed.
 - Generic image utilities — `TextureResizer` + `RenderDebugTools` live in the sibling `PFound.Render.Utilities` asmdef (independent of Core per `Render/MODULE.md` FR-003).
-- Effect-specific shader helpers — each later phase ships its own `*.hlsl` (`Blur.hlsl`, `Outline.hlsl`, `ColorGrading.hlsl`). Core ships only the universal subset.
-- GameSpecific assets — Phase 1 produces no runtime assets (Constitution III). The placeholder `Core.Editor/.../RenderGameSpecificAssetProviders` documents the registration convention for future phases.
+- Effect-specific shader helpers — each effect sub-module ships its own `*.hlsl` (`Blur.hlsl`, `Outline.hlsl`, `Overdraw.hlsl`). Core ships only the universal subset.
+- GameSpecific assets — Phase 1 produces no runtime assets (Constitution III). The placeholder `Core/Editor/Runtime/RenderGameSpecificAssetProviders.cs` documents the registration convention for future phases.
 
 ---
 
@@ -140,6 +140,7 @@ Per CODING-STYLE.md §8, both `RenderTexturePool` and `GlobalShaderParameterMana
 - `RenderFeatureBaseTests` — `OnCreate` / `OnDispose` invocation count, `Dispose(true)` idempotence, `IDisposable` pass auto-disposal, material auto-cleanup.
 - `RenderPassBaseTests` — `Populate` / `Execute` invocation count, pass-data field round-trip, injection-point + tag forwarding.
 - `RenderTextureLeaseTests` — `Dispose()` idempotence, default-struct safety, `Token` / `Owner` mismatch handling.
+- `RenderTextureKeyTests` — structural equality across all fields, constructor validation, `ToString` readability, and the `(RenderTextureFormat, RenderTextureReadWrite)` → `GraphicsFormat` folding (linear vs sRGB stay distinct; HDR derived from the resolved format).
 - `RenderTexturePoolLeaseReleaseTests` — basic lease/release cycle, key-keyed reuse, distinct-key isolation.
 - `RenderTexturePoolEvictionTests` — idle-eviction threshold behaviour, free-stack drain.
 - `RenderTexturePoolLeakDetectionTests` — leak threshold, ring buffer writes, `LeakReported` no-duplicate guarantee.
@@ -173,22 +174,20 @@ Per CODING-STYLE.md §8, both `RenderTexturePool` and `GlobalShaderParameterMana
 
 ## Editor Companion — `PFound.Render.Core.Editor`
 
-Sibling editor asmdef at `Render/Core.Editor/` (Editor-only platform include). Phase 1 surface is intentionally minimal:
+Editor asmdef at `Core/Editor/PFound.Render.Core.Editor.asmdef` (Editor-only platform include), with its sources under `Core/Editor/Runtime/`. The surface is intentionally minimal:
 
 | Type | Role |
 |---|---|
-| `RenderGameSpecificAssetProviders` (`internal static`, `Core.Editor/Runtime/`) | Placeholder for future-phase `IGameSpecificAssetProvider` registrations under `Assets/GameSpecific/Render/`. **Phase 1 ships an empty class** — the convention is documented and the wiring point is reserved; no providers are registered (Phase 1 produces no runtime assets per Constitution III). Phase 2 ColorGrading was the first phase to add a real provider here (Identity LUT under `Assets/GameSpecific/Render/LUTs/Identity.asset`), in its own editor asmdef. |
+| `RenderGameSpecificAssetProviders` (`internal static`, `Core/Editor/Runtime/`) | Reserved registration point for `IGameSpecificAssetProvider` instances whose generated assets the parent project's `GameSpecificAssetGuard` would auto-create under `Assets/GameSpecific/Render/`. **The class ships empty** — the comment inside it reads "Phase 1: intentionally empty". No provider is registered, no such asset exists, and no Render sub-module produces a GameSpecific runtime asset today. The class documents the convention and reserves the wiring point; nothing more. |
 
 **Asmdef references:** `PFound.Render.Core`, `PFound.Utilities.EditorHelpers`, `Unity.RenderPipelines.Universal.Runtime`, `Unity.RenderPipelines.Universal.Editor`. Editor-only (`includePlatforms: ["Editor"]`).
 
-Future phases land their providers in their own `<Module>.Editor/` sibling folder (matches the Render-submodule layout convention — see `Render/MODULE.md` and `RenderContext/MODULE.md` for the established pattern).
+The Render layout convention is an `Editor/` subfolder inside the sub-module, with the Editor asmdef at the root of that subfolder — `RenderContext` and `UIShapes` follow the same shape.
 
 ---
 
 ## Related
 
 - `Render/MODULE.md` — top-level Render submodule index + phase roadmap.
-- `Render/Utilities/MODULE.md` — sibling utility asmdef (`TextureResizer`, `RenderDebugTools`), independent of Core.
-- `Render/CHANGELOG.md` — release notes; Phase 1 entry is `[0.1.0]` (2026-05-15).
-- `specs/012-render-core-foundation/` — full spec / plan / tasks / contracts for Phase 1.
+- `Render/Utilities/MODULE.md` — sibling utility asmdef (`TextureFactory`, `TextureResizer`, `RenderingTools`, `RenderDebugTools`), independent of Core.
 - `Render/BatchRendering/MODULE.md`, `Render/RenderContext/MODULE.md`, `Render/UIShapes/MODULE.md` — example consumers of `RenderFeatureBase` / `RenderPassBase` / `RenderTexturePool` from later phases.
