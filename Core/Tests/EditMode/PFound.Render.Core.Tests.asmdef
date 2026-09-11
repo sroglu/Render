@@ -9,8 +9,7 @@
         "UnityEditor.TestRunner",
         "Unity.Burst",
         "Unity.Collections",
-        "Unity.Mathematics",
-        "Unity.Profiling.Core"
+        "Unity.Mathematics"
     ],
     "includePlatforms": [
         "Editor"
